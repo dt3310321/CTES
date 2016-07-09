@@ -12,7 +12,7 @@ The 14 real-world programs are avaliable in the real-world programs folder, and 
 In the home folder, we offer you two excutable files to evaluate CTES on efficiency.
 myproject1 will transform the source code into AST, myproject2 is our CTES for bug detection.
 
-We offer you an example of micro-benchmark of bad and good version.See them in the folder
+We offer you an example of micro-benchmark of bad and good version. See them in the folder
 micro-benchmark.
 
 
