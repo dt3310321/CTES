@@ -1,0 +1,205 @@
+
+
+
+#include "my-include.h"
+
+
+#ifdef MAPPING_CHDIR
+/* Keep track of the path the user has chdir'd into and respond with
+ * that to pwd commands.  This is to avoid having the absolue disk
+ * path returned, which I want to avoid.
+ */
+char mapped_path[ MAXPATHLEN ] = "/";
+
+
+char *mapping_getcwd(char *path, size_t size)  /* NEW.. a replacement for mapping_getwd */
+{
+
+  printf("Copying at most %d chars into buffer path[] whose size = %d\n", size, MAXPATHLEN + 1);
+
+  /* OK */
+  strncpy(path, mapped_path, size);
+  path[size-1] = '\0';
+  return path;
+}
+
+
+/* Make these globals rather than local to mapping_chdir to avoid stack overflow */
+char pathspace[ MAXPATHLEN ];
+char old_mapped_path[ MAXPATHLEN ];
+
+
+void
+#ifdef __STDC__
+do_elem(char *dir)
+#else
+do_elem( dir )
+      char *dir;
+#endif
+{
+      /* . */
+      if( dir[0] == '.' && dir[1] == '\0' ){
+              /* ignore it */
+              return;
+      }
+
+      /* .. */
+      if( dir[0] == '.' && dir[1] == '.' && dir[2] == '\0' ){
+              char *last;
+              /* lop the last directory off the path */
+              if(( last = strrchr( mapped_path, '/') )){
+                      /* If start of pathname leave the / */
+                      if( last == mapped_path )
+                              last++;
+                      *last = '\0';
+              }
+              return;
+      }
+      
+      /* append the dir part with a leading / unless at root */
+      if( !(mapped_path[0] == '/' && mapped_path[1] == '\0') )
+        if (strlen(mapped_path) < sizeof(mapped_path) - 1)       /* NEW */
+	  /*OK*/
+	  strcat(mapped_path, "/");
+      
+      if (sizeof(mapped_path) - strlen(mapped_path) > 1)     /* NEW */
+	/*OK*/
+	strncat(mapped_path, dir, sizeof(mapped_path) - strlen(mapped_path) - 1);  /* NEW */
+}
+
+
+int
+#ifdef __STDC__
+mapping_chdir(char *orig_path)
+#else
+mapping_chdir( orig_path )
+      char *orig_path;
+#endif
+{
+      int ret;
+      char *sl, *path;
+
+      strcpy( old_mapped_path, mapped_path );
+      path = &pathspace[0];
+      
+      /*OK*/
+      printf ("strlen(path) = %d \t path=%s\n", strlen (path), path);
+      printf ("strlen(orig_path) = %d \t orig_path=%s\n", strlen (orig_path), orig_path);
+
+      if (strlen (path) >0) 
+	strcpy( path, orig_path );
+
+      /* / at start of path, set the start of the mapped_path to / */
+      if( path[0] == '/' ){
+              mapped_path[0] = '/';
+              mapped_path[1] = '\0';
+              path++;
+      }
+
+      while( (sl = strchr( path, '/' )) ){
+              char *dir;
+              dir = path;
+              *sl = '\0';
+              path = sl + 1;
+              if( *dir )
+                      do_elem( dir );
+              if( *path == '\0' )
+                      break;
+      }
+
+      if( *path ){
+	printf("path = %s.. calling do_elem\n", path);
+	do_elem( path );
+      }
+      printf("mapped_path = %s\n", mapped_path);
+      
+      if (strlen(mapped_path) >= MAXPATHLEN){
+	printf("ALERT: mapped_path[MAXPATHLEN] has been overflowed!\n");
+      }
+      
+      if( (ret = chdir( mapped_path )) < 0 ){
+	printf("couldn't chdir to %s !\n", mapped_path);
+	strcpy(mapped_path, old_mapped_path );
+	printf("mapped_path changed to %s\n", mapped_path);
+      }
+
+      return ret;
+}
+
+
+#define getwd(d) mapping_getwd(d)
+#define getcwd(d,u) mapping_getcwd((d), (u))   /* NEW */
+
+#endif /* MAPPING_CHDIR */
+
+
+/* Define pwd */
+
+void
+#ifdef __STDC__
+pwd(void)
+#else
+pwd()
+#endif
+{
+  int canary = 7;
+  char path[MAXPATHLEN + 1]; /* Path to return to client */
+
+#ifndef MAPPING_CHDIR
+#ifdef HAVE_GETCWD
+  extern char *getcwd();
+#else
+#ifdef __STDC__
+  extern char *getwd(char *);
+#else
+  extern char *getwd();
+#endif
+#endif
+#endif /* MAPPING_CHDIR */
+  
+#ifdef HAVE_GETCWD
+  if (getcwd(path,MAXPATHLEN) == (char *) NULL)     /* call is made to mapping_getcwd */
+    {
+      printf("wu-ftpd: Illegal path supplied!\n");
+    }
+#else
+    if (getwd(path) == (char *) NULL)
+#endif
+      {
+      printf("path = %s\n", path);
+      printf("Current directory = %s\n", path);
+      printf("max len of path is %d, strlen(path) = %d\n", MAXPATHLEN, strlen(path));
+      printf("Canary should be 7.  Canary = %d\n", canary);
+      if (canary != 7)
+	printf("ALERT: path[MAXPATHLEN + 1] has been overflowed!\n");
+      }
+}
+
+
+  int main(int argc, char **argv){
+
+  char orig_path[MAXPATHLEN + 20];
+  FILE *f;
+
+  f = fopen("pathfile", "r");
+  fgets(orig_path, MAXPATHLEN + 20, f);  /* get path name */
+  fclose(f);
+ 
+  printf("orig_path = %s\n", orig_path);
+
+  mapping_chdir(orig_path);   /* this can overflow mapped_path[] and pathspace[] */
+  pwd();            /* get current working directory.. this calls getwcd = mapping_getwd*/
+                    /* mapping_getwd may overflow path[] */
+ 
+
+  return 0;
+
+}
+  
+
+/*
+
+</source>
+
+*/
+

@@ -1,0 +1,15 @@
+	bad1   		bad2
+splint 14(误报0)    7（误报8 )       
+CPPcheck 2(误报0)    0(误报0);
+
+
+CTES   14（误报0）     9个（误报1）
+Error:9
+warning+:12
+warning:2
+
+
+
+splint  0.84   0.32
+CTES    0.92   0.04
+Cppcheck 0.08   0
